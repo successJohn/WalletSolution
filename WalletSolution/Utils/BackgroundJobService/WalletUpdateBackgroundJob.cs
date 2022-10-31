@@ -1,4 +1,9 @@
-﻿using System.Diagnostics.Tracing;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using System.Collections.Generic;
+using System.Diagnostics.Tracing;
+using System.Drawing;
+using WalletSolution.Infrastructure.Persistence;
 using WalletSolution.Utils.interfaces;
 
 namespace WalletSolution.Utils.BackgroundJobService
@@ -7,12 +12,14 @@ namespace WalletSolution.Utils.BackgroundJobService
     {
         private readonly ILogger<WalletUpdateBackgroundJob> _logger;
         private IServiceScopeFactory _scopeFactory;
+        private readonly WalletDbContext _walletDbContext;
 
         public WalletUpdateBackgroundJob(ILogger<WalletUpdateBackgroundJob> logger, IServiceScopeFactory scopeFactory,
-            IScheduleConfig<WalletUpdateBackgroundJob> config) : base(config.CronExpression, config.TimeZoneInfo)
+            IScheduleConfig<WalletUpdateBackgroundJob> config, WalletDbContext walletDbContext) : base(config.CronExpression, config.TimeZoneInfo)
         {
             _logger = logger;
             _scopeFactory = scopeFactory;
+            _walletDbContext = walletDbContext;
         }
 
         public override Task StartAsync(CancellationToken cancellationToken)
@@ -25,14 +32,26 @@ namespace WalletSolution.Utils.BackgroundJobService
         {
             using (var scope = _scopeFactory.CreateScope())
             {
-               // UpdateTransactions();
+                UpdateTransactions();
 
             }
             _logger.LogInformation($"{DateTime.Now:hh:mm:ss} Daily transaction spool is working.");
             return Task.CompletedTask;
         }
 
-        private void UpdateTransactions() { }
+        private void UpdateTransactions()
+        {
+
+
+            var query = "Declare @Rowcount INT = 1" +
+                "WHILE (@Rowcount > 0)" +
+                "UPDATE TOP (100000)" +
+                "SET Balance = Balance * 0.1 " +
+                "SET @Rowcount = @@ROWCOUNT";
+
+           
+            _walletDbContext.NGNWallets.FromSqlRaw(query);
+        }
         
 
         public override Task StopAsync(CancellationToken cancellationToken)
